@@ -1,0 +1,80 @@
+name: Воркспейс — монорепо-режим
+
+# Собирает всё против HEAD каждого репозитория, как на машине разработчика:
+# соседние папки на месте, Xcode подменяет ими зависимости по identity,
+# версии из манифестов не участвуют вообще.
+#
+# Ловит рассогласование НЕЗАРЕЛИЖЕННОЙ работы: правка в kufar.Foundation
+# и её потребители должны быть согласованы прямо сейчас. Версионных проблем
+# этот режим не видит принципиально — для них есть versioned.yml.
+#
+# repository_dispatch нужен потому, что мета-репозиторий сам по себе меняется
+# редко: поломку приносит мерж в чужой репозиторий, и дёрнуть сборку должен он.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [team-repo-merged]
+
+concurrency:
+  group: workspace-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deplint:
+    name: Граф зависимостей
+    # Намеренно ubuntu: deplint читает манифесты и не требует ни Xcode,
+    # ни сети, ни тулчейна. Отдельной job — чтобы нарушение границы
+    # было видно через минуту, а не после двадцатиминутной сборки.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Клонировать репозитории команд
+        env:
+          KUFAR_ORG: https://github.com/${{ github.repository_owner }}
+        run: ./Tools/bootstrap.sh
+
+      - name: Проверить направление зависимостей
+        run: python3 Tools/deplint.py
+
+  build:
+    name: Сборка и тесты
+    runs-on: macos-15
+    # Не needs: deplint — пусть оба результата приходят разом.
+    # Линтер быстрее и обычно первым объясняет, почему упала сборка.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Клонировать репозитории команд
+        env:
+          KUFAR_ORG: https://github.com/${{ github.repository_owner }}
+        run: ./Tools/bootstrap.sh
+
+      - name: Показать, что подменено локально
+        # Диагностика: в этом режиме ни одна зависимость не должна ехать из сети.
+        # Строчка "Fetching https://github.com/..." в логе означает, что identity
+        # пакета разъехалась с именем папки — то самое жёсткое правило из README.
+        run: ./Tools/bootstrap.sh --status
+
+      - name: Тесты
+        run: |
+          xcodebuild test \
+            -workspace KufarWorkspace.xcworkspace \
+            -scheme KufarDemo \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults.xcresult

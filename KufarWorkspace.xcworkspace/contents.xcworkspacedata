@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:README.md">
+   </FileRef>
+   <FileRef
+      location = "group:kufar-architecture.md">
+   </FileRef>
+   <Group
+      location = "group:Tools"
+      name = "Tools">
+      <FileRef
+         location = "group:publish.sh">
+      </FileRef>
+      <FileRef
+         location = "group:migrate-to-team-repos.sh">
+      </FileRef>
+      <FileRef
+         location = "group:bootstrap.sh">
+      </FileRef>
+      <FileRef
+         location = "group:deplint.py">
+      </FileRef>
+      <FileRef
+         location = "group:check-registry.sh">
+      </FileRef>
+   </Group>
+   <FileRef
+      location = "group:auto_team/kufar.Auto">
+   </FileRef>
+   <FileRef
+      location = "group:auto_team/kufar.AutoContracts">
+   </FileRef>
+   <FileRef
+      location = "group:goods_team/kufar.Goods">
+   </FileRef>
+   <FileRef
+      location = "group:goods_team/kufar.GoodsContracts">
+   </FileRef>
+   <FileRef
+      location = "group:identity_team/kufar.Identity">
+   </FileRef>
+   <FileRef
+      location = "group:identity_team/kufar.IdentityContracts">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/kufar.Analytics">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/kufar.AppComposition">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/kufar.AppFeature">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/kufar.DesignComponents">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/kufar.DesignTokens">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/kufar.Foundation">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/kufar.ListingKit">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/kufar.Navigation">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/kufar.SchemaKit">
+   </FileRef>
+   <FileRef
+      location = "group:posting_team/kufar.Posting">
+   </FileRef>
+   <FileRef
+      location = "group:posting_team/kufar.PostingContracts">
+   </FileRef>
+   <FileRef
+      location = "group:search_team/kufar.CatalogContracts">
+   </FileRef>
+   <FileRef
+      location = "group:search_team/kufar.Search">
+   </FileRef>
+   <FileRef
+      location = "group:search_team/kufar.SearchContracts">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/KufarDemoApp/KufarDemo.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:platform_team/KufarDemoApp">
+   </FileRef>
+</Workspace>

@@ -1,0 +1,17 @@
+{
+  "registries": {
+    "[default]": {
+      "url": "https://spm-registry.byklishevich.com"
+    }
+  },
+  "security": {
+    "registryOverrides": {
+      "spm-registry.byklishevich.com": {
+        "signing": {
+          "onUnsigned": "silentAllow"
+        }
+      }
+    }
+  },
+  "version": 1
+}

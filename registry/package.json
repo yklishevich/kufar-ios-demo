@@ -1,0 +1,23 @@
+{
+  "name": "spm-registry",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Реестр пакетов Swift (SE-0292) на Cloudflare Workers",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "db:init": "wrangler d1 execute spm-registry --local --file=schema.sql",
+    "db:init:remote": "wrangler d1 execute spm-registry --remote --file=schema.sql"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.5.0",
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0",
+    "wrangler": "^3.99.0"
+  }
+}

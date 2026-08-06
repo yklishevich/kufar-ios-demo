@@ -1,0 +1,81 @@
+name: Версионная сборка — по тегам
+
+# Собирает приложение БЕЗ локальной подмены: соседних папок здесь нет,
+# поэтому SwiftPM резолвит зависимости из гита по тегам, как у любого,
+# кто подключил пакеты по URL.
+#
+# Отличие от workspace.yml ровно одно — не клонируются соседи. Из этой
+# одной строчки разницы следует совершенно другой класс ловимых ошибок:
+#
+#   • тег, который забыли проставить после мержа;
+#   • пустое пересечение диапазонов — kufar.Search ждёт 2.x, kufar.Goods
+#     заперт в [1.0, 2.0), резолв падает целиком;
+#   • не поднятый пол в манифесте: код использует API из 1.1.0,
+#     а объявлено from: "1.0.0" — локально незаметно годами.
+#
+# Ни одну из трёх монорепо-режим увидеть не может: он игнорирует версии.
+
+on:
+  schedule:
+    - cron: '0 3 * * 1-5'      # релизы соседей приезжают асинхронно, проверяем ночью
+  workflow_dispatch:
+
+jobs:
+  resolve:
+    name: Резолв ${{ matrix.mode }}
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        # pinned — что соберётся у того, кто клонирует репозиторий сегодня.
+        # latest — что произойдёт, когда кто-нибудь нажмёт Update to Latest
+        #          Package Versions. Расходятся они ровно тогда, когда сосед
+        #          выпустил ломающую 1.x, обещав, что она совместимая.
+        mode: [pinned, latest]
+
+    steps:
+      - name: Клонировать только приложение
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh repo clone ${{ github.repository_owner }}/KufarDemoApp app
+
+      - name: Снять фиксацию версий
+        if: matrix.mode == 'latest'
+        # Удаление лок-файла и есть "Update to Latest Package Versions":
+        # без него резолвер возьмёт максимум из разрешённых диапазонов.
+        run: rm -f app/KufarDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+      - name: Резолв зависимостей из гита
+        working-directory: app
+        run: xcodebuild -resolvePackageDependencies -project KufarDemo.xcodeproj -scheme KufarDemo
+
+      - name: Какие версии выбраны
+        working-directory: app
+        # Печатаем в лог намеренно: при падении сборки первый вопрос —
+        # "с какими версиями собирали", и ответ должен быть в том же логе.
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("KufarDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved")
+          pins = json.loads(p.read_text()).get("pins", [])
+          for pin in sorted(pins, key=lambda x: x["identity"]):
+              state = pin.get("state", {})
+              print(f'  {pin["identity"]:<26} {state.get("version") or state.get("branch") or state.get("revision", "")[:8]}')
+          PY
+
+      - name: Тесты
+        working-directory: app
+        run: |
+          xcodebuild test \
+            -project KufarDemo.xcodeproj \
+            -scheme KufarDemo \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Зафиксировать расхождение
+        if: failure() && matrix.mode == 'latest'
+        # pinned зелёный, latest красный — значит совместимость сломана
+        # внутри мажора. Это не поломка приложения, это поломка обещания semver
+        # у кого-то из соседей, и чинить надо там.
+        run: |
+          echo "::warning::latest упал при зелёном pinned — сосед выпустил ломающую минорную версию"

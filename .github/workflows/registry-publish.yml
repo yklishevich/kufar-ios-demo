@@ -1,0 +1,84 @@
+name: Реестр — публикация пакета
+
+# Публикует версию пакета в реестр SE-0292.
+#
+# Триггер — тег, а не push в ветку. Разница принципиальная: публикация
+# на каждый коммит превратила бы версию из решения в побочный эффект, и
+# `from: "1.0.0"` у потребителей начал бы подтягивать чужие промежуточные
+# состояния. Релиз остаётся явным актом команды.
+#
+# Формат тега: kufar.Foundation-1.2.3 — идентичность пакета и версия.
+# Идентичность совпадает с именем папки, поэтому адресат читается из тега
+# без вычисления diff по путям.
+#
+# Важно: репозитории команд лежат отдельно, и теги ставятся в них, а не здесь.
+# Этот workflow нужен для ручного запуска и как эталон того, что делает
+# `Tools/publish.sh --push --tag`, который публикует из рабочей копии.
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Идентичность пакета, например kufar.Foundation"
+        required: true
+      version:
+        description: "Версия, например 1.1.0"
+        required: true
+      team:
+        description: "Папка команды, например platform_team"
+        required: true
+
+concurrency:
+  group: registry-publish-${{ inputs.package }}
+  cancel-in-progress: false
+
+env:
+  # Адрес зашит: реестр один, стейджинга нет, а лишняя переменная в настройках
+  # GitHub — ещё одно место, где значение разойдётся с wrangler.toml.
+  REGISTRY_URL: https://spm-registry.byklishevich.com
+
+jobs:
+  publish:
+    # macOS ради swift package archive-source: архив должен собирать тот же
+    # тулчейн, который потом будет его разбирать.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Поднять репозитории команд
+        env:
+          KUFAR_ORG: https://github.com/${{ github.repository_owner }}
+        run: ./Tools/bootstrap.sh --status || ./Tools/bootstrap.sh
+
+      - name: Проверить, что пакет существует
+        run: |
+          DIR="${{ inputs.team }}/${{ inputs.package }}"
+          test -f "$DIR/Package.swift" || {
+            echo "::error::В $DIR нет Package.swift"
+            exit 1
+          }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Опубликовать в реестр
+        env:
+          PUBLISH_TOKEN: ${{ secrets.REGISTRY_PUBLISH_TOKEN }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          PKG="${{ inputs.package }}"
+          node registry/scripts/publish.mjs \
+            --package "${{ inputs.team }}/$PKG" \
+            --scope "${PKG%%.*}" \
+            --name "${PKG#*.}" \
+            --version "${{ inputs.version }}"
+
+      - name: Проверить, что версия резолвится
+        # Публикация без проверки — половина дела: строка в базе есть,
+        # а отдаётся ли она клиенту, выясняется у первого потребителя.
+        run: |
+          PKG="${{ inputs.package }}"
+          curl -sf -H "Accept: application/vnd.swift.registry.v1+json" \
+            "$REGISTRY_URL/${PKG%%.*}/${PKG#*.}/${{ inputs.version }}" \
+            | tee /dev/stderr | grep -q '"checksum"'
