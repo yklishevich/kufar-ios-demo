@@ -1,6 +1,6 @@
 # Реестр пакетов Swift на Cloudflare Workers
 
-Реализация [SE-0292](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0292-package-registry-service.md) — того самого пакетного реестра, который в [основном документе](../kufar-architecture.md) назван промышленной альтернативой гит-зависимостям.
+Реализация [SE-0292](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0292-package-registry-service.md) — того самого пакетного реестра, который в [основном документе](https://github.com/yklishevich/kufar-ios-demo/blob/main/architecture-ios-app.md) назван промышленной альтернативой гит-зависимостям.
 
 **Демо переведено на него целиком:** все 87 зависимостей в двадцати манифестах объявлены через `.package(id:)`, гит-URL не осталось ни одного. Реестр обслуживает настоящие пакеты `kufar.*` из репозиториев команд, а не отдельную песочницу.
 
@@ -77,7 +77,7 @@ npm run deploy                                 # заведёт DNS и серт�
 
 По тегу вида `kufar.Foundation-1.2.3` — идентичность пакета плюс версия. Идентичность совпадает с именем папки, поэтому адресат читается из тега без вычисления diff по путям.
 
-Теги ставятся **в репозиториях команд**, а не в воркспейсе. Повседневный путь — `./Tools/publish.sh --push --tag` из рабочей копии; workflow [`registry-publish.yml`](../.github/workflows/registry-publish.yml) делает то же самое по `workflow_dispatch` и служит эталоном.
+Теги ставятся **в репозиториях команд**, а не в воркспейсе. Повседневный путь — `./Tools/publish.sh --push --tag` из рабочей копии; workflow [`registry-publish.yml`](https://github.com/yklishevich/kufar-ios-demo/blob/main/.github/workflows/registry-publish.yml) делает то же самое по `workflow_dispatch` и служит эталоном.
 
 Триггер именно тег, а не push в ветку. Публикация на каждый коммит превратила бы версию из решения в побочный эффект, и `from: "1.0.0"` у потребителей начал бы подтягивать чужие промежуточные состояния — то есть HEAD-режим, только медленнее и с иллюзией версионирования.
 

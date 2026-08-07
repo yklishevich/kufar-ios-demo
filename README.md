@@ -1,6 +1,6 @@
 # kufar-ios — воркспейс
 
-Демо архитектуры к документу [kufar-architecture.md](kufar-architecture.md): **6 команд, 6 репозиториев, 20 SPM-пакетов, 43 таргета, свой пакетный реестр**.
+Демо архитектуры к документу [architecture-ios-app.md](https://github.com/yklishevich/kufar-ios-demo/blob/main/architecture-ios-app.md): **6 команд, 6 репозиториев, 20 SPM-пакетов, 43 таргета, свой пакетный реестр**.
 
 ## Быстрый старт
 
@@ -15,7 +15,7 @@ git clone https://github.com/yklishevich/kufar-ios-demo.git && cd kufar-ios-demo
 
 ## Как это устроено
 
-**Адрес — не идентичность.** Пакеты подключаются через [пакетный реестр](registry/README.md) (SE-0292): в манифесте стоит имя, а не URL.
+**Адрес — не идентичность.** Пакеты подключаются через [пакетный реестр](https://github.com/yklishevich/kufar-ios-demo/blob/main/registry/README.md) (SE-0292): в манифесте стоит имя, а не URL.
 
 ```swift
 .package(id: "kufar.GoodsContracts", from: "1.0.0")
@@ -60,7 +60,7 @@ kufar-ios/                            ← воркспейс, не репози�
 > (directory name) 'foundation'
 > ```
 >
-> Правила этого нет в документации — оно найдено экспериментом, см. [registry/README.md](registry/README.md). Линтер его проверяет.
+> Правила этого нет в документации — оно найдено экспериментом, см. [registry/README.md](https://github.com/yklishevich/kufar-ios-demo/blob/main/registry/README.md). Линтер его проверяет.
 
 Ещё два инструмента, оба разовые: `Tools/check-registry.sh` проверяет, что реестр отвечает и отдаёт ожидаемые версии, `Tools/reset-all.sh` схлопывает историю всех репозиториев к одному коммиту.
 
@@ -82,7 +82,7 @@ kufar-ios/                            ← воркспейс, не репози�
 ./Tools/publish.sh <твой-логин>             # создать и запушить
 ```
 
-Плюс свой реестр — [`registry/`](registry/README.md), там инструкция по развёртыванию.
+Плюс свой реестр — [`registry/`](https://github.com/yklishevich/kufar-ios-demo/blob/main/registry/README.md), там инструкция по развёртыванию.
 
 **Повседневная синхронизация.** Локально Xcode собирает рабочую копию, CI — то, что в гите. Расхождение между ними и есть самая частая причина «у меня собирается, на билд-сервере нет»: правки лежат незакоммиченными в восьми репозиториях сразу. Один проход закрывает:
 
@@ -281,7 +281,7 @@ targets: [
 
 ## Запуск
 
-**Открывать нужно [`KufarWorkspace.xcworkspace`](KufarWorkspace.xcworkspace), а не отдельный `Package.swift`.**
+**Открывать нужно `KufarWorkspace.xcworkspace`, а не отдельный `Package.swift`.**
 
 Это не вкусовщина, а выбор режима. Внутри воркспейса Xcode подменяет URL-зависимости локальными папками — ты собираешь HEAD всех репозиториев, и правка в `kufar.Foundation` видна в `kufar.Goods` сразу, без тега. Откроешь одиночный пакет — SwiftPM пойдёт в сеть и соберёт по **тегам**: это тоже работает, но ты получишь последние выпущенные версии соседей, а не их рабочие копии рядом.
 
@@ -346,7 +346,7 @@ xcrun simctl openurl booted "kufar://help/rules"                   # веб-фо
 
 ## Что осталось за кадром
 
-**Пакетный реестр — не «за кадром», а в [`registry/`](registry/README.md).** Реализация SE-0292 на Cloudflare Workers: R2 под архивы, D1 под метаданные, пять GET-эндпоинтов, публикация из `Tools/publish.sh --push --tag`, тесты в `workerd`. Развёрнут на `spm-registry.byklishevich.com`, все двадцать пакетов резолвятся через него.
+**Пакетный реестр — не «за кадром», а в [`registry/`](https://github.com/yklishevich/kufar-ios-demo/blob/main/registry/README.md).** Реализация SE-0292 на Cloudflare Workers: R2 под архивы, D1 под метаданные, пять GET-эндпоинтов, публикация из `Tools/publish.sh --push --tag`, тесты в `workerd`. Развёрнут на `spm-registry.byklishevich.com`, все двадцать пакетов резолвятся через него.
 
 **Правило про имя папки найдено экспериментом, а не в документации.** Сначала выяснилось, что `swift package edit` вообще отказывается работать с registry-зависимостью:
 

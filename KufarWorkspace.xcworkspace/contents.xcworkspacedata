@@ -5,7 +5,10 @@
       location = "group:README.md">
    </FileRef>
    <FileRef
-      location = "group:kufar-architecture.md">
+      location = "group:architecture-ios-app.md">
+   </FileRef>
+   <FileRef
+      location = "group:architecture-overall.md">
    </FileRef>
    <Group
       location = "group:Tools"
