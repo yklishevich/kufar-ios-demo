@@ -94,10 +94,23 @@ jobs:
               print(f'  {pin["identity"]:<26} {state.get("version") or state.get("branch") or state.get("revision", "")[:8]}')
           PY
 
-      - name: Тесты
+      - name: Сборка
         working-directory: platform/KufarDemoApp
+        # build, а не test — и это не упрощение, а следствие режима.
+        #
+        # Тест-план ссылается на таргеты пакетов по относительным путям
+        # (container:../kufar.AppComposition). Работает это только когда
+        # пакет локальный. Здесь он приезжает из реестра версией, а тестовые
+        # таргеты зависимостей потребителю не собираются — отсюда
+        # "There are no test bundles available to test" и exit 70.
+        #
+        # Прогонять их тут и незачем: ArchitectureTests проверяет раскладку
+        # папок воркспейса, которой в версионном режиме нет по определению —
+        # соседей не клонировали. Предмет этой джобы — резолв и совместимость
+        # версий, и он проверяется тем, что опубликованные версии собираются
+        # вместе. Тесты кода живут в workspace.yml и team-integration.yml.
         run: |
-          xcodebuild test \
+          xcodebuild build \
             -project KufarDemo.xcodeproj \
             -scheme KufarDemo \
             -destination "$SIMULATOR" \
