@@ -13,7 +13,7 @@
  * схема хранения не меняется.
  */
 
-import { problem, json } from "./protocol";
+import { problem, json, isoSeconds } from "./protocol";
 import { isValidSegment, parseVersion } from "./types";
 import { normalizeGitURL } from "./handlers";
 import type { Env } from "./types";
@@ -116,7 +116,7 @@ export async function publish(request: Request, env: Env): Promise<Response> {
         parsed.major, parsed.minor, parsed.patch, parsed.prerelease,
         actual, archive.length, archiveKey,
         body.manifest ?? "", JSON.stringify(body.manifests ?? {}),
-        body.repositoryURL ?? null, new Date().toISOString()
+        body.repositoryURL ?? null, isoSeconds(new Date())
     ).run();
 
     if (body.repositoryURL) {

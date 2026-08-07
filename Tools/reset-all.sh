@@ -173,6 +173,16 @@ reset_repo() {
                 printf "    origin переведён на SSH: %s\n" "$url"
                 ;;
         esac
+
+        # Отдельный pushurl, если он задан, перекрывает url — но только для
+        # отправки. Из-за этого `git remote -v` показывает у origin разные
+        # адреса на fetch и push, а `set-url` выглядит сработавшим, хотя
+        # правит он именно url: пуш продолжает уходить по HTTPS и спрашивать
+        # логин. Убираем, чтобы адрес был один и вопросов не возникало.
+        if git -C "$dir" config --get remote.origin.pushurl >/dev/null 2>&1; then
+            git -C "$dir" config --unset-all remote.origin.pushurl || true
+            printf "    убран отдельный pushurl\n"
+        fi
     fi
 
     # Теги на удалённой стороне живут своей жизнью: force-push ветки их

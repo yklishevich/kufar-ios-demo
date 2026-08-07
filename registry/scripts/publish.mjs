@@ -3,7 +3,7 @@
  * Публикует пакет в реестр: собирает архив исходников, считает контрольную
  * сумму, отправляет в Worker.
  *
- *   node scripts/publish.mjs --package ../packages/Toolbox \
+ *   node scripts/publish.mjs --package ../platform_team/kufar.Foundation \
  *                            --scope kufar --name Toolbox --version 1.0.0
  *
  * Адрес реестра и токен берутся из окружения: REGISTRY_URL, PUBLISH_TOKEN.

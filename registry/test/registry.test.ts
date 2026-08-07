@@ -141,6 +141,25 @@ describe("метаданные релиза", () => {
         const response = await call("/kufar/Toolbox/latest");
         expect(response.status).toBe(400);
     });
+
+    // Регрессия. publishedAt отдавался как new Date().toISOString(), то есть
+    // с миллисекундами — валидный ISO 8601, который SwiftPM не принимает:
+    // он читает поле через ISO8601DateFormatter с настройками по умолчанию,
+    // а дробные секунды требуют опции .withFractionalSeconds. Резолв падал
+    // целиком, и сообщение про дату не говорило ничего:
+    //
+    //   failed fetching kufar.AppComposition version 1.0.2 release information:
+    //   dataCorrupted(… "Expected date string to be ISO8601-formatted.")
+    //
+    // seed() намеренно кладёт в базу значение С миллисекундами: проверяется,
+    // что чинит именно чтение, а не аккуратность записи.
+    it("отдаёт publishedAt без дробных секунд", async () => {
+        const response = await call("/kufar/Toolbox/1.0.0");
+        const body = await response.json<{ publishedAt: string }>();
+
+        expect(body.publishedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+        expect(body.publishedAt).not.toContain(".");
+    });
 });
 
 describe("манифест", () => {

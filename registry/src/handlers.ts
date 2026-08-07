@@ -3,7 +3,7 @@
  * чтобы зарезолвить и скачать зависимость.
  */
 
-import { json, problem, baseHeaders, linkHeader } from "./protocol";
+import { json, problem, baseHeaders, linkHeader, isoSeconds } from "./protocol";
 import type { Env, PackageID, ReleaseRow } from "./types";
 import { isValidSegment, parseVersion } from "./types";
 
@@ -76,7 +76,10 @@ export async function releaseMetadata(env: Env, id: PackageID, version: string):
             metadata: {
                 repositoryURLs: row.repository_url ? [row.repository_url] : [],
             },
-            publishedAt: row.published_at,
+            // Нормализуется на чтении, а не только на записи: строки
+            // с миллисекундами уже могли лечь в D1 до того, как формат
+            // починили, и чинить их миграцией ради одного поля незачем.
+            publishedAt: isoSeconds(row.published_at),
         },
         {
             Link: linkHeader([

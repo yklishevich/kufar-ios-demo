@@ -14,9 +14,6 @@
          location = "group:publish.sh">
       </FileRef>
       <FileRef
-         location = "group:migrate-to-team-repos.sh">
-      </FileRef>
-      <FileRef
          location = "group:bootstrap.sh">
       </FileRef>
       <FileRef

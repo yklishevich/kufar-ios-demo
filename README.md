@@ -11,7 +11,7 @@ git clone https://github.com/yklishevich/kufar-ios-demo.git && cd kufar-ios-demo
 
 Дальше в Xcode: схема `KufarDemo`, симулятор, ⌘R. Тесты — ⌘U.
 
-Если хочется просто читать код: единственный `switch` по вертикалям на всё приложение — [`SearchScreen.swift`](https://github.com/yklishevich/kufar.Search/blob/main/Sources/SearchUI/SearchScreen.swift), композиционный корень целиком — [`AppComposition.swift`](https://github.com/yklishevich/kufar.AppComposition/blob/main/Sources/AppComposition/AppComposition.swift), остальное — в таблице «Где что смотреть» ниже.
+Если хочется просто читать код: единственный `switch` по вертикалям на всё приложение — [`SearchScreen.swift`](https://github.com/yklishevich/kufar-search/blob/main/kufar.Search/Sources/SearchUI/SearchScreen.swift), композиционный корень целиком — [`AppComposition.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.AppComposition/Sources/AppComposition/AppComposition.swift), остальное — в таблице «Где что смотреть» ниже.
 
 ## Как это устроено
 
@@ -28,7 +28,7 @@ git clone https://github.com/yklishevich/kufar-ios-demo.git && cd kufar-ios-demo
 ```
 kufar-ios/                            ← воркспейс, не репозиторий
 ├── KufarWorkspace.xcworkspace        ← открывать нужно именно его
-├── Tools/{bootstrap.sh, deplint.py, publish.sh}
+├── Tools/{bootstrap, publish, deplint, check-registry, reset-all}
 ├── registry/                         ← реализация реестра на Cloudflare
 │
 ├── goods_team/                       ← репозиторий kufar-goods
@@ -62,6 +62,8 @@ kufar-ios/                            ← воркспейс, не репози�
 >
 > Правила этого нет в документации — оно найдено экспериментом, см. [registry/README.md](registry/README.md). Линтер его проверяет.
 
+Ещё два инструмента, оба разовые: `Tools/check-registry.sh` проверяет, что реестр отвечает и отдаёт ожидаемые версии, `Tools/reset-all.sh` схлопывает историю всех репозиториев к одному коммиту.
+
 **Режимы `bootstrap.sh`:**
 
 ```bash
@@ -70,7 +72,7 @@ kufar-ios/                            ← воркспейс, не репози�
 ./Tools/bootstrap.sh --pull     # обновить всё разом
 ```
 
-Воркспейс — тоже репозиторий, но особенный: в нём только `README`, документ, `Tools/` и сам `.xcworkspace`. Клоны команд заигнорены (`*_team/Kufar*/`), их поднимает `bootstrap.sh`. Это мета-репозиторий: точка входа, а не код.
+Воркспейс — тоже репозиторий, но особенный: в нём README, документ, `Tools/`, реестр и сам `.xcworkspace` — и ни строчки кода приложения. Папки команд заигнорены целиком (`*_team/`), их поднимает `bootstrap.sh`. Это мета-репозиторий: точка входа, а не код.
 
 **Публикация под своим владельцем.** Резолв зависимостей от владельца не зависит — их адресует реестр, а гит хранит только исходники. Поэтому достаточно создать репозитории и запушить:
 
@@ -90,7 +92,7 @@ kufar-ios/                            ← воркспейс, не репози�
 ./Tools/publish.sh --push -m "текст"  # своё сообщение вместо автоматического
 ```
 
-Сообщение выводится из того, что реально изменилось: `KufarSearch: Search, SearchData, SearchUI, манифест`.
+Сообщение выводится из того, что реально изменилось: `kufar-search: kufar.Search, kufar.SearchContracts`.
 
 Версию поднимает флаг `--tag`, и по умолчанию он ставит **patch**:
 
@@ -175,7 +177,15 @@ kufar-ios/                            ← воркспейс, не репози�
 
 Чего делать точно нельзя — отдавать эти репозитории продуктовой команде. Кто владеет композиционным корнем, тот решает, что попадает в сборку, и продуктовая команда в этой роли начнёт гейтить релизы всех остальных.
 
-Внутри репозитория проходит ещё одна граница, и она важнее, чем кажется: `kufar.AppFeature` (корневой флоу) зависит **только от контрактных пакетов**, поэтому собирается и тестируется без сети, без единого `*Data` и без единой вертикали. `kufar.AppComposition` — чистая проводка, единственное место с конкретными реализациями. Слей их в один пакет — и тесты корневого флоу перестанут что-либо доказывать.
+Внутри репозитория проходит ещё одна граница, и она важнее, чем кажется: `kufar.AppFeature` (корневой флоу) зависит **только от контрактных пакетов**, поэтому собирается и тестируется без сети, без единого `*Data` и без единой вертикали. `kufar.AppComposition` — чистая проводка, единственное место с конкретными реализациями.
+
+Разделены они именно на **пакеты**, а не на таргеты внутри одного, и разница тоньше, чем кажется.
+
+Оставь два таргета в одном пакете — запрет никуда не денется: SwiftPM проверяет зависимости на уровне таргета, и `import Goods` в `AppFeature` не соберётся, пока `Goods` не появится в его `dependencies:`. Компилятор всё так же на страже.
+
+Потеряется другое. Список зависимостей **пакета** перестанет быть утверждением: в нём будут лежать все вертикали, потому что они нужны проводке. Сегодня, чтобы протащить вертикаль в корневой флоу, надо добавить пакет — это видно в диффе манифеста и ловится на ревью. В общем пакете хватит дописать имя в `dependencies:` таргета, ничего нового не подключая.
+
+Дальше — механика: любой потребитель `AppFeature` резолвил бы весь граф вместе с вертикалями; версия стала бы общей, и корневой флоу не выпустить, не выпустив проводку. Поэтому граница проведена по пакету — это не педантизм, а разница между «нельзя» и «не принято».
 
 Риск у этой роли известный: каждая новая вертикаль требует строчки в `AppComposition`, то есть PR в чужой репозиторий. Лечится тем, что строчка должна оставаться тривиальной — один `.concat` и один кейс таба. Как только в корне заводится вертикально-специфичная логика, платформенная команда становится бутылочным горлышком по-настоящему.
 
@@ -201,9 +211,39 @@ kufar-ios/                            ← воркспейс, не репози�
 
 Двадцать пакетов на две вертикали выглядит избыточно ровно до вопроса «а что резолвится, когда я подключаю одну строчку». Пакет — единица не только кода, но и **разрешения зависимостей**: подключив продукт, ты резолвишь весь пакет целиком со всеми его зависимостями. Отсюда правило — то, что подключают многие, живёт в пакете с минимальным графом.
 
-**`kufar.GoodsContracts` отдельно от `kufar.Goods`.** Поиск берёт `GoodsInterface` — один enum на десять строк. Будь он продуктом `kufar.Goods`, поиск резолвил бы вместе с ним дизайн-систему, ListingKit, аналитику и навигацию — всё, от чего зависит реализация вертикали. И версионно сцепился бы с ними: `kufar.Goods` поднял дизайн-систему до 3.0, а `kufar.Auto` ещё на 2.x — резолв падает, хотя нужен был только enum.
+**`kufar.GoodsContracts` отдельно от `kufar.Goods`.** Поиск берёт `GoodsInterface` — один enum на десять строк. Будь он продуктом `kufar.Goods`, поиск резолвил бы вместе с ним дизайн-систему, ListingKit, аналитику и навигацию — всё, от чего зависит реализация вертикали.
 
-**И главное — цикла бы не получилось развязать.** `kufar.Auto` зависит от `kufar.SearchContracts`: экран дилера открывает поисковый запрос «все объявления продавца». `kufar.Search` зависит от `kufar.AutoContracts`: тап по результату открывает карточку авто. Если бы контракты жили внутри своих feature-пакетов, вышло бы `KufarSearch → KufarAuto → KufarSearch`, и SwiftPM отказался бы резолвить граф. Вынос контрактов — не оптимизация, а условие существования схемы.
+Само по себе это не смертельно: сборку поиска лишние ограничения не ломают, пока в его графе нет второй вертикали с несовместимым диапазоном. Ломается другое — **контракт и реализация делят один номер версии**, а меняются с разной частотой: маршруты раз в квартал, экраны ежедневно.
+
+Сценарий, где это стреляет:
+
+1. «Товары» добавляют `GoodsRoute.reviews` — и в том же релизе `kufar.Goods 4.0` переезжают на `DesignComponents 3.0`;
+2. поиску нужен новый маршрут, значит нужен `kufar.Goods 4.0` — взять один enum, не взяв всю реализацию, нельзя;
+3. поиск начинает транзитивно требовать `DesignComponents >= 3.0`;
+4. приложение тянет ещё и `kufar.Auto`, который пока на `2.x`, — диапазоны не пересекаются, резолв падает.
+
+Поиск заблокирован, хотя не написал ни строчки про дизайн-систему. С разделёнными контрактами шаг 1 распадается надвое: `kufar.GoodsContracts 2.0` уносит новый маршрут и **ни одного нового ограничения**, а `kufar.Goods 4.0` со своей дизайн-системой едет отдельно и никого не держит.
+
+**И главное — цикла бы не получилось развязать.** `kufar.Auto` зависит от `kufar.SearchContracts`: экран дилера открывает поисковый запрос «все объявления продавца». `kufar.Search` зависит от `kufar.AutoContracts`: тап по результату открывает карточку авто. Если бы контракты жили внутри своих feature-пакетов, вышло бы `kufar.Search → kufar.Auto → kufar.Search`, и SwiftPM отказался бы резолвить граф. Вынос контрактов — не оптимизация, а условие существования схемы.
+
+Здесь напрашивается возражение: пусть контракты остаются внутри, но отдаются отдельным **продуктом** — разве этого не достаточно? Нет, и причина механическая. Чтобы сослаться на любой продукт чужого пакета, надо сначала объявить сам пакет:
+
+```swift
+dependencies: [.package(id: "kufar.Search", from: "1.0.0")],
+targets: [.target(name: "AutoUI", dependencies: [
+    .product(name: "SearchContracts", package: "kufar.Search")   // ← требует строки выше
+])]
+```
+
+Значит `kufar.Auto` объявит `kufar.Search`, а `kufar.Search` объявит `kufar.Auto`, и резолв упадёт:
+
+```
+cyclic dependency declaration found: kufar.Search -> kufar.Auto -> kufar.Search
+```
+
+Проверка идёт по графу **пакетов** и происходит до построения графа таргетов. Граф таргетов при этом был бы ацикличным — `AutoUI → SearchContracts`, `SearchUI → AutoContracts`, а контрактные таргеты не зависят ни от чего, — но до него дело не доходит.
+
+Отсюда точная формулировка: ограничение — следствие выбора «много пакетов», а не свойство языка. Единица зависимости здесь пакет, поэтому и контракт обязан быть пакетом. Были бы `Search` и `Auto` таргетами одного пакета, взаимные ссылки на контрактные таргеты резолвились бы нормально. Контракты и там пришлось бы отделить — цикл между таргетами запрещён ровно так же, — но ценой ошибки был бы отказ сборки одного пакета, а не нерезолвимый граф на весь проект.
 
 **`kufar.Foundation` отдельно от всего SwiftUI** — у него платформенная планка iOS 15 против iOS 17 у остальных: этот код переиспользуют расширения, виджет и часы. Платформы объявляются на пакет, не на таргет.
 
@@ -269,25 +309,25 @@ xcrun simctl openurl booted "kufar://help/rules"                   # веб-фо
 
 | Приём | Файл |
 |---|---|
-| **Единая лента, вертикаль из данных** — единственный switch на всё приложение | [`search_team/.../SearchScreen.swift`](search_team/kufar.Search/Sources/SearchUI/SearchScreen.swift) |
-| **Подача: вторая точка схождения**, публикация → карточка | [`posting_team/.../PostingScreens.swift`](posting_team/kufar.Posting/Sources/PostingUI/PostingScreens.swift) |
-| **Черновик переживает краш** — Codable-контракт подачи | [`posting_team/.../PostingRoute.swift`](posting_team/kufar.PostingContracts/Sources/PostingInterface/PostingRoute.swift) |
-| **Категория → вертикаль**, дерево с бэкенда | [`search_team/.../SearchRoute.swift`](search_team/kufar.CatalogContracts/Sources/CatalogContracts/Category.swift) |
-| **Server-driven фильтры**: смена категории меняет набор полей | [`search_team/.../FiltersScreen.swift`](search_team/kufar.Search/Sources/SearchUI/FiltersScreen.swift) |
-| Разные схемы под разные категории, поле неизвестного типа | [`search_team/.../SearchFixtures.swift`](search_team/kufar.Search/Sources/SearchData/SearchFixtures.swift) |
-| **Один рендерер схем** на фильтры и на карточку | [`platform_team/.../SchemaKit.swift`](platform_team/kufar.SchemaKit/Sources/SchemaKit/SchemaKit.swift) |
-| **Каркас карточки со слотами** — дженерики вместо `AnyView` | [`platform_team/.../ListingDetailScaffold.swift`](platform_team/kufar.ListingKit/Sources/ListingKit/ListingDetailScaffold.swift) |
-| **Слот в строке ленты** — где стирание выбрано осознанно и как глубоко опущена коробка | [`platform_team/.../Blocks.swift`](platform_team/kufar.ListingKit/Sources/ListingKit/Blocks.swift) |
-| **Схема или слот**: у авто расчёт платежа, у товаров пусто — и это ответ | [`auto_team/.../AutoRowAccessory.swift`](auto_team/kufar.Auto/Sources/AutoUI/AutoRowAccessory.swift) → [`goods_team/.../GoodsAssembly.swift`](goods_team/kufar.Goods/Sources/Goods/GoodsAssembly.swift) |
-| **Вертикаль внутри чужого флоу** — шаг подачи с разбором VIN, дженерик без стирания | [`auto_team/.../AutoPostingStep.swift`](auto_team/kufar.Auto/Sources/AutoUI/AutoPostingStep.swift) → [`posting_team/.../PostingScreens.swift`](posting_team/kufar.Posting/Sources/PostingUI/PostingScreens.swift) |
-| Заполнение слотов вертикалью, вывод типа на месте вызова | [`auto_team/.../AutoScreens.swift`](auto_team/kufar.Auto/Sources/AutoUI/AutoScreens.swift) |
-| **Ошибка — состояние, а не guard return**: `LoadState`, ретрай, деградация схемы с событием в мониторинг | [`goods_team/.../GoodsDetailScreen.swift`](goods_team/kufar.Goods/Sources/GoodsUI/GoodsDetailScreen.swift) |
-| **Вертикаль не знает соседей**: «объявления продавца» — это поиск | [`goods_team/.../GoodsDetailScreen.swift`](goods_team/kufar.Goods/Sources/GoodsUI/GoodsDetailScreen.swift) |
-| **Роутер на таб**, `resetAll` при логауте | [`platform_team/.../AppRouter.swift`](platform_team/kufar.Navigation/Sources/Navigation/AppRouter.swift) |
-| **Диплинк без вертикали** — экран-прокладка, `replaceLast` | [`platform_team/.../ListingResolve.swift`](platform_team/kufar.AppFeature/Sources/AppFeature/ListingResolve.swift) |
-| **Инверсия зависимостей**: протокол внизу, реализация наверху | [`platform_team/.../Networking.swift`](platform_team/kufar.Foundation/Sources/Networking/Networking.swift) → [`identity_team/.../KeychainSessionStore.swift`](identity_team/kufar.Identity/Sources/AuthData/KeychainSessionStore.swift) |
-| **Сессия ≠ Auth**: логаут из настроек без `import Auth` | [`identity_team/.../ProfileScreens.swift`](identity_team/kufar.Identity/Sources/ProfileUI/ProfileScreens.swift) |
-| **Композиционный корень** целиком | [`platform_team/.../AppComposition.swift`](platform_team/kufar.AppComposition/Sources/AppComposition/AppComposition.swift) |
+| **Единая лента, вертикаль из данных** — единственный switch на всё приложение | [`search_team/.../SearchScreen.swift`](https://github.com/yklishevich/kufar-search/blob/main/kufar.Search/Sources/SearchUI/SearchScreen.swift) |
+| **Подача: вторая точка схождения**, публикация → карточка | [`posting_team/.../PostingScreens.swift`](https://github.com/yklishevich/kufar-posting/blob/main/kufar.Posting/Sources/PostingUI/PostingScreens.swift) |
+| **Черновик переживает краш** — Codable-контракт подачи | [`posting_team/.../PostingRoute.swift`](https://github.com/yklishevich/kufar-posting/blob/main/kufar.PostingContracts/Sources/PostingInterface/PostingRoute.swift) |
+| **Категория → вертикаль**, дерево с бэкенда | [`search_team/.../SearchRoute.swift`](https://github.com/yklishevich/kufar-search/blob/main/kufar.CatalogContracts/Sources/CatalogContracts/Category.swift) |
+| **Server-driven фильтры**: смена категории меняет набор полей | [`search_team/.../FiltersScreen.swift`](https://github.com/yklishevich/kufar-search/blob/main/kufar.Search/Sources/SearchUI/FiltersScreen.swift) |
+| Разные схемы под разные категории, поле неизвестного типа | [`search_team/.../SearchFixtures.swift`](https://github.com/yklishevich/kufar-search/blob/main/kufar.Search/Sources/SearchData/SearchFixtures.swift) |
+| **Один рендерер схем** на фильтры и на карточку | [`platform_team/.../SchemaKit.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.SchemaKit/Sources/SchemaKit/SchemaKit.swift) |
+| **Каркас карточки со слотами** — дженерики вместо `AnyView` | [`platform_team/.../ListingDetailScaffold.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.ListingKit/Sources/ListingKit/ListingDetailScaffold.swift) |
+| **Слот в строке ленты** — где стирание выбрано осознанно и как глубоко опущена коробка | [`platform_team/.../Blocks.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.ListingKit/Sources/ListingKit/Blocks.swift) |
+| **Схема или слот**: у авто расчёт платежа, у товаров пусто — и это ответ | [`auto_team/.../AutoRowAccessory.swift`](https://github.com/yklishevich/kufar-auto/blob/main/kufar.Auto/Sources/AutoUI/AutoRowAccessory.swift) → [`goods_team/.../GoodsAssembly.swift`](https://github.com/yklishevich/kufar-goods/blob/main/kufar.Goods/Sources/Goods/GoodsAssembly.swift) |
+| **Вертикаль внутри чужого флоу** — шаг подачи с разбором VIN, дженерик без стирания | [`auto_team/.../AutoPostingStep.swift`](https://github.com/yklishevich/kufar-auto/blob/main/kufar.Auto/Sources/AutoUI/AutoPostingStep.swift) → [`posting_team/.../PostingScreens.swift`](https://github.com/yklishevich/kufar-posting/blob/main/kufar.Posting/Sources/PostingUI/PostingScreens.swift) |
+| Заполнение слотов вертикалью, вывод типа на месте вызова | [`auto_team/.../AutoScreens.swift`](https://github.com/yklishevich/kufar-auto/blob/main/kufar.Auto/Sources/AutoUI/AutoScreens.swift) |
+| **Ошибка — состояние, а не guard return**: `LoadState`, ретрай, деградация схемы с событием в мониторинг | [`goods_team/.../GoodsDetailScreen.swift`](https://github.com/yklishevich/kufar-goods/blob/main/kufar.Goods/Sources/GoodsUI/GoodsDetailScreen.swift) |
+| **Вертикаль не знает соседей**: «объявления продавца» — это поиск | [`goods_team/.../GoodsDetailScreen.swift`](https://github.com/yklishevich/kufar-goods/blob/main/kufar.Goods/Sources/GoodsUI/GoodsDetailScreen.swift) |
+| **Роутер на таб**, `resetAll` при логауте | [`platform_team/.../AppRouter.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.Navigation/Sources/Navigation/AppRouter.swift) |
+| **Диплинк без вертикали** — экран-прокладка, `replaceLast` | [`platform_team/.../ListingResolve.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.AppFeature/Sources/AppFeature/ListingResolve.swift) |
+| **Инверсия зависимостей**: протокол внизу, реализация наверху | [`platform_team/.../Networking.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.Foundation/Sources/Networking/Networking.swift) → [`identity_team/.../KeychainSessionStore.swift`](https://github.com/yklishevich/kufar-identity/blob/main/kufar.Identity/Sources/AuthData/KeychainSessionStore.swift) |
+| **Сессия ≠ Auth**: логаут из настроек без `import Auth` | [`identity_team/.../ProfileScreens.swift`](https://github.com/yklishevich/kufar-identity/blob/main/kufar.Identity/Sources/ProfileUI/ProfileScreens.swift) |
+| **Композиционный корень** целиком | [`platform_team/.../AppComposition.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.AppComposition/Sources/AppComposition/AppComposition.swift) |
 
 ---
 
@@ -334,7 +374,7 @@ doesn't match override's identity (directory name) 'toolbox'
 
 Монорепозиторий выигрывает по обеим колонкам и всё равно отклонён: он снимает не только трение, но и **изоляцию**, ради которой всё построено. Граница, которую ничто не охраняет, держится на дисциплине ревьюеров; здесь её охраняет отдельный репозиторий с собственными правами доступа и `deplint.py` в CI.
 
-Переезд сделан скриптом `Tools/migrate-to-team-repos.sh` — через `git subtree`, то есть с переносом коммитов, а не копированием файлов.
+Переезд делался через `git subtree`, с переносом коммитов, а не копированием файлов. Той истории, однако, уже нет: `Tools/reset-all.sh` схлопнул все репозитории к одному коммиту, потому что для проекта, который открывают посмотреть на архитектуру, черновая история — шум. Что именно потерялось, скрипт перечисляет в своей шапке.
 
 **Чего реестр не решает.** Добавление вертикали остаётся дорогим при любом дроблении, кроме полного монорепозитория: `SharedKernel` и его потребители в разных репозиториях, значит фазовый переход из 2.3 никуда не девается. И **историю он не сохраняет** — она свойство репозитория, а не имени пакета.
 
@@ -345,5 +385,3 @@ doesn't match override's identity (directory name) 'toolbox'
 **Сети.** `APIClient` вызывается, но возвращает пустые данные — репозитории отдают фикстуры.
 
 **Persistence**, downsampling изображений, `_printChanges` — описаны в документе, но чтобы увидеть эффект, нужна настоящая лента с фотографиями.
-
-**Известное ограничение:** пакет собран без доступа к Swift-тулчейну. Граф зависимостей, видимость продуктов, метки инициализаторов и ссылки на типы проверены программно; синтаксис Swift — нет.

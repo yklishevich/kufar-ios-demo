@@ -2,7 +2,7 @@
 
 Реализация [SE-0292](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0292-package-registry-service.md) — того самого пакетного реестра, который в [основном документе](../kufar-architecture.md) назван промышленной альтернативой гит-зависимостям.
 
-**Демо на него не переведено, и это осознанно.** Аргумент в README воркспейса — «двадцать один репозиторий вынужден, с реестром хватило бы шести» — от рабочей реализации рядом становится сильнее, а не слабее: рассмотрено, сделано, и всё равно не применено, потому что цена входа не окупается на десятке разработчиков. Реестр обслуживает игрушечные пакеты из `packages/`.
+**Демо переведено на него целиком:** все 87 зависимостей в двадцати манифестах объявлены через `.package(id:)`, гит-URL не осталось ни одного. Реестр обслуживает настоящие пакеты `kufar.*` из репозиториев команд, а не отдельную песочницу.
 
 ## Зачем реестр вообще
 
@@ -75,7 +75,9 @@ npm run deploy                                 # заведёт DNS и серт�
 
 ## Публикация
 
-Автоматическая, по тегу вида `Toolbox-1.0.1` — workflow [`registry-publish.yml`](../.github/workflows/registry-publish.yml).
+По тегу вида `kufar.Foundation-1.2.3` — идентичность пакета плюс версия. Идентичность совпадает с именем папки, поэтому адресат читается из тега без вычисления diff по путям.
+
+Теги ставятся **в репозиториях команд**, а не в воркспейсе. Повседневный путь — `./Tools/publish.sh --push --tag` из рабочей копии; workflow [`registry-publish.yml`](../.github/workflows/registry-publish.yml) делает то же самое по `workflow_dispatch` и служит эталоном.
 
 Триггер именно тег, а не push в ветку. Публикация на каждый коммит превратила бы версию из решения в побочный эффект, и `from: "1.0.0"` у потребителей начал бы подтягивать чужие промежуточные состояния — то есть HEAD-режим, только медленнее и с иллюзией версионирования.
 
@@ -83,8 +85,8 @@ npm run deploy                                 # заведёт DNS и серт�
 
 ```bash
 REGISTRY_URL=https://spm-registry.byklishevich.com PUBLISH_TOKEN=… \
-  node scripts/publish.mjs --package packages/Toolbox \
-                           --scope kufar --name Toolbox --version 1.0.0
+  node scripts/publish.mjs --package ../platform_team/kufar.Foundation \
+                           --scope kufar --name Foundation --version 1.0.0
 ```
 
 Архив собирает клиент через `swift package archive-source`, а не сервер: тулчейн знает, что относится к пакету, а что нет — уважает `.gitignore`, выкидывает `.build`. Повторять эту логику на сервере значит однажды разойтись с тулчейном и опубликовать архив, который не собирается.
@@ -93,21 +95,22 @@ REGISTRY_URL=https://spm-registry.byklishevich.com PUBLISH_TOKEN=… \
 
 ## Проверить резолв вживую
 
-Публиковать в порядке зависимости — `Greeter` ссылается на `Toolbox`:
+Публиковать нужно в порядке зависимости — потребитель не соберётся, пока в реестре нет того, на что он ссылается. Самая короткая цепочка в демо:
 
 ```bash
 export REGISTRY_URL=https://spm-registry.byklishevich.com PUBLISH_TOKEN=…
-node scripts/publish.mjs --package packages/Toolbox --scope kufar --name Toolbox --version 1.0.0
-node scripts/publish.mjs --package packages/Greeter --scope kufar --name Greeter --version 1.0.0
-
-cd consumer && swift run ConsumerDemo
+cd registry
+node scripts/publish.mjs --package ../platform_team/kufar.Foundation \
+                        --scope kufar --name Foundation --version 1.0.0
+node scripts/publish.mjs --package ../goods_team/kufar.GoodsContracts \
+                        --scope kufar --name GoodsContracts --version 1.0.0
 ```
 
-Потребитель просит только `kufar.Greeter`; `Toolbox` приезжает транзитивно. То есть проверяется **резолв цепочки**, а не скачивание одного архива.
+`kufar.GoodsContracts` просит только `kufar.Foundation`, и тот приезжает транзитивно — то есть проверяется **резолв цепочки**, а не скачивание одного архива.
 
-`Toolbox` и `Greeter` лежат в одном репозитории и релизятся независимо — с гит-URL так нельзя: манифест ищется в корне, а тег принадлежит репозиторию целиком. Это и есть то свойство реестра, ради которого всё затевалось.
+Главное свойство здесь видно на `search_team`: `kufar.CatalogContracts`, `kufar.SearchContracts` и `kufar.Search` лежат в одном репозитории и релизятся независимо. С гит-URL так нельзя — манифест ищется в корне, а тег принадлежит репозиторию целиком. Ради этого всё и затевалось.
 
-Настройка реестра — в `consumer/.swiftpm/configuration/registries.json`, то есть **в репозитории**, а не в домашнем каталоге: клонировал и собрал, настраивать нечего.
+Настройка реестра лежит в `.swiftpm/configuration/registries.json` **каждого пакета**, а не в домашнем каталоге: клонировал и собрал, настраивать нечего.
 
 ## Работает ли локальная подмена — проверка перед миграцией
 

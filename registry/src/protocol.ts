@@ -45,6 +45,31 @@ export function parseAccept(header: string | null): AcceptHeader | null {
     return null;
 }
 
+/**
+ * Дата в формате, который принимает клиент SwiftPM: без дробных секунд.
+ *
+ * `toISOString()` возвращает `2026-08-06T16:19:03.854Z`. Это валидный ISO 8601,
+ * и почти любой парсер его берёт — но не тот, что стоит в SwiftPM. Он читает
+ * `publishedAt` через `ISO8601DateFormatter` с настройками по умолчанию,
+ * а дробные секунды там включаются отдельной опцией `.withFractionalSeconds`.
+ * Без неё резолв падает целиком:
+ *
+ *     failed fetching kufar.AppComposition version 1.0.2 release information:
+ *     dataCorrupted(… "Expected date string to be ISO8601-formatted.")
+ *
+ * Сообщение приходит на этапе резолва и про дату не говорит ни слова —
+ * найти причину можно только сравнив ответ реестра со спецификацией руками.
+ * Поэтому формат нормализуется в одном месте на весь реестр, а не по месту
+ * использования.
+ *
+ * Принимает и строку: в D1 уже могли лечь значения с миллисекундами,
+ * и чтение обязано их чинить, а не полагаться на то, что запись была верной.
+ */
+export function isoSeconds(value: Date | string): string {
+    const text = typeof value === "string" ? value : value.toISOString();
+    return text.replace(/\.\d+(?=Z$|[+-]\d{2}:\d{2}$)/, "");
+}
+
 /** Заголовки, обязательные в каждом ответе реестра. */
 export function baseHeaders(extra: Record<string, string> = {}): Headers {
     const headers = new Headers(extra);

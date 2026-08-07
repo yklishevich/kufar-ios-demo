@@ -134,7 +134,11 @@ fi
 echo "Проверка графа зависимостей:"
 python3 "$ROOT/Tools/deplint.py"
 
-if [[ "$MODE" != "--status" ]]; then
+# Открывать воркспейс — поведение для человека за машиной. На CI это запуск
+# Xcode внутри job'а: он поднимается минуты, ничего полезного не делает и
+# держит job до таймаута, после которого тот отменяется. GitHub Actions,
+# как и все известные CI, выставляет CI=true — по нему и различаем.
+if [[ "$MODE" != "--status" && -z "${CI:-}" ]]; then
   echo
   echo "Открываю воркспейс…"
   open "$ROOT/KufarWorkspace.xcworkspace" 2>/dev/null || \

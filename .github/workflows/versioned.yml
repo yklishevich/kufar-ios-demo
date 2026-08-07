@@ -1,13 +1,14 @@
 name: Версионная сборка — по тегам
 
 # Собирает приложение БЕЗ локальной подмены: соседних папок здесь нет,
-# поэтому SwiftPM резолвит зависимости из гита по тегам, как у любого,
-# кто подключил пакеты по URL.
+# поэтому SwiftPM резолвит зависимости из реестра по версиям, как у любого,
+# кто клонировал только приложение.
 #
 # Отличие от workspace.yml ровно одно — не клонируются соседи. Из этой
 # одной строчки разницы следует совершенно другой класс ловимых ошибок:
 #
-#   • тег, который забыли проставить после мержа;
+#   • версия, которую забыли опубликовать после мержа: тег в гите есть,
+#     а в реестре её нет, и для потребителей она не существует;
 #   • пустое пересечение диапазонов — kufar.Search ждёт 2.x, kufar.Goods
 #     заперт в [1.0, 2.0), резолв падает целиком;
 #   • не поднятый пол в манифесте: код использует API из 1.1.0,
@@ -23,7 +24,24 @@ on:
 jobs:
   resolve:
     name: Резолв ${{ matrix.mode }}
-    runs-on: macos-15
+    runs-on: macos-26
+    # Xcode закреплён явно, а не взят дефолтом образа. Дефолт — движущаяся
+    # цель: обновится образ, сменится тулчейн, и CI разойдётся с машинами
+    # разработчиков без единого коммита. Тот же довод, по которому пакеты
+    # подключаются через from:, а не веткой, а общий workflow — по тегу v1.
+    #
+    # 26.5 выбран под то, что стоит локально. На macos-26 рядом лежат
+    # 26.6 (дефолт) и 26.4.1 — менять версию здесь, а не полагаться на образ.
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+      # Симулятор закреплён вместе с тулчейном и по той же причине. Имя
+      # устройства — тоже движущаяся цель: на macos-26 линейки iPhone 16
+      # уже нет, только 17-я. Версию рантайма фиксируем явно, чтобы
+      # «свежий образ» не менял то, на чём гоняются тесты.
+      #
+      # Меняется в паре с DEVELOPER_DIR: 26.5 сверху — 26.5 здесь.
+      SIMULATOR: platform=iOS Simulator,name=iPhone 17,OS=26.5
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -34,23 +52,36 @@ jobs:
         mode: [pinned, latest]
 
     steps:
-      - name: Клонировать только приложение
+      # Версия печатается намеренно: при расхождении с локальной машиной
+      # первый вопрос — "чем собирали", и ответ должен быть в том же логе.
+      - name: Тулчейн
+        run: xcodebuild -version
+
+      # Клонируется репозиторий команды платформы, а внутри берётся одна папка
+      # с приложением. Отдельного репозитория KufarDemoApp больше нет: пакеты
+      # сведены в шесть репозиториев по командам, и приложение переехало
+      # в kufar-platform вместе с ними.
+      #
+      # Соседние папки при этом рядом окажутся — но подмены не будет:
+      # её делает Xcode для пакетов, добавленных в тот же .xcworkspace,
+      # а здесь открывается .xcodeproj. Режим остаётся версионным.
+      - name: Клонировать репозиторий платформы
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh repo clone ${{ github.repository_owner }}/KufarDemoApp app
+        run: gh repo clone ${{ github.repository_owner }}/kufar-platform platform
 
       - name: Снять фиксацию версий
         if: matrix.mode == 'latest'
         # Удаление лок-файла и есть "Update to Latest Package Versions":
         # без него резолвер возьмёт максимум из разрешённых диапазонов.
-        run: rm -f app/KufarDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+        run: rm -f platform/KufarDemoApp/KufarDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
-      - name: Резолв зависимостей из гита
-        working-directory: app
+      - name: Резолв зависимостей из реестра
+        working-directory: platform/KufarDemoApp
         run: xcodebuild -resolvePackageDependencies -project KufarDemo.xcodeproj -scheme KufarDemo
 
       - name: Какие версии выбраны
-        working-directory: app
+        working-directory: platform/KufarDemoApp
         # Печатаем в лог намеренно: при падении сборки первый вопрос —
         # "с какими версиями собирали", и ответ должен быть в том же логе.
         run: |
@@ -64,12 +95,12 @@ jobs:
           PY
 
       - name: Тесты
-        working-directory: app
+        working-directory: platform/KufarDemoApp
         run: |
           xcodebuild test \
             -project KufarDemo.xcodeproj \
             -scheme KufarDemo \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination "$SIMULATOR" \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Зафиксировать расхождение
