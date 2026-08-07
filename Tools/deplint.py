@@ -30,6 +30,7 @@ LAYER_ORDER = ["foundation", "contracts", "platform", "feature", "root"]
 
 TARGET_LAYER = {
     "SharedKernel": "foundation", "Networking": "foundation",
+    "NetworkingInterface": "foundation", "NetworkingTesting": "foundation",
 
     "AnalyticsAPI": "contracts", "SessionInterface": "contracts",
     "SessionInterfaceTesting": "contracts", "CatalogContracts": "contracts",
@@ -53,6 +54,17 @@ TARGET_LAYER = {
     "AppFeature": "root", "AppComposition": "root",
     "AppFeatureTests": "root", "ArchitectureTests": "root",
 }
+
+# Конкретный APIClient называет только composition root — это ровно то, что
+# обещает строка «Composition root — единственное место с конкретными
+# реализациями» в 7.1. Адаптеры вертикалей держат HTTPPerforming
+# из NetworkingInterface и о транспорте не знают.
+#
+# Auth пока в исключении: он реализует RequestInterceptor, а тот живёт
+# в Networking — протоколом владеет поставщик, потому что потребляет его
+# APIClient. Переедет отдельной фазой (правка ломающая, в отличие от
+# аддитивного HTTPPerforming), после чего список схлопнется до одного имени.
+NETWORKING_CONCRETE = {"AppComposition", "Auth", "AuthData"}
 
 VERTICALS = ["Search", "Posting", "Goods", "Auto", "Profile", "Auth"]
 ASSEMBLIES = set(VERTICALS)
@@ -239,6 +251,10 @@ def main() -> int:
                     if module == "SwiftUI" and target.endswith("Interface"):
                         problems.append(f"[SwiftUI в контракте] {rel}:{lineno} — "
                                         f"{target} обязан быть Foundation-only")
+                    if module == "Networking" and target not in NETWORKING_CONCRETE:
+                        problems.append(f"[конкретный транспорт] {rel}:{lineno} — "
+                                        f"{target} импортирует Networking; "
+                                        f"адаптеру нужен NetworkingInterface")
                     if module in SYSTEM or module == target:
                         continue
                     if module not in owner:
