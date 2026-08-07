@@ -55,16 +55,14 @@ TARGET_LAYER = {
     "AppFeatureTests": "root", "ArchitectureTests": "root",
 }
 
-# Конкретный APIClient называет только composition root — это ровно то, что
-# обещает строка «Composition root — единственное место с конкретными
-# реализациями» в 7.1. Адаптеры вертикалей держат HTTPPerforming
-# из NetworkingInterface и о транспорте не знают.
+# Конкретный APIClient называет ровно одно место — composition root. Это и
+# есть строка «Composition root — единственное место с конкретными
+# реализациями» из 7.1, доведённая до проверяемого состояния.
 #
-# Auth пока в исключении: он реализует RequestInterceptor, а тот живёт
-# в Networking — протоколом владеет поставщик, потому что потребляет его
-# APIClient. Переедет отдельной фазой (правка ломающая, в отличие от
-# аддитивного HTTPPerforming), после чего список схлопнется до одного имени.
-NETWORKING_CONCRETE = {"AppComposition", "Auth", "AuthData"}
+# Всё остальное работает с NetworkingInterface: адаптеры вертикалей держат
+# HTTPPerforming, Auth реализует RequestInterceptor. Оба протокола живут
+# в контрактном таргете, поэтому реализующему не нужен APIClient.
+NETWORKING_CONCRETE = {"AppComposition"}
 
 VERTICALS = ["Search", "Posting", "Goods", "Auto", "Profile", "Auth"]
 ASSEMBLIES = set(VERTICALS)

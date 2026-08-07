@@ -17,9 +17,20 @@
 # а не вычисляется: пакетов двадцать, граф меняется раз в квартал,
 # а вычисленный порядок пришлось бы отлаживать вместо публикации.
 #
-#   ./Tools/republish-all.sh --dry-run     что и с какой версией уедет
-#   ./Tools/republish-all.sh               опубликовать
-#   ./Tools/republish-all.sh kufar.Search  только один пакет и всё, что ниже него
+# Публикуются ВСЕ теги пакета, а не только последний. Иначе ломается
+# `pinned`-режим versioned.yml: Package.resolved фиксирует 1.0.0, а в реестре
+# лежит одна свежая версия — и «клонировал и собрал» перестаёт работать
+# для любого, у кого есть лок-файл.
+#
+# Каждая версия собирается из СВОЕГО тега через отдельное worktree.
+# Публиковать старый номер из текущей рабочей копии нельзя: в реестр уедет
+# сегодняшний код под вчерашней версией, и расхождение всплывёт у потребителя,
+# а не здесь.
+#
+#   ./Tools/republish-all.sh --dry-run       что и какие версии уедут
+#   ./Tools/republish-all.sh                 опубликовать всё
+#   ./Tools/republish-all.sh --latest-only   только последнюю версию каждого
+#   ./Tools/republish-all.sh kufar.Search    до этого пакета включительно
 #
 # Окружение:
 #   REGISTRY_URL    адрес реестра
@@ -62,11 +73,14 @@ ORDER=(
 
 DRY=0
 ONLY=""
-case "${1:-}" in
-  --dry-run) DRY=1 ;;
-  "")        ;;
-  *)         ONLY="$1" ;;
-esac
+LATEST_ONLY=0
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run)     DRY=1 ;;
+    --latest-only) LATEST_ONLY=1 ;;
+    *)             ONLY="$arg" ;;
+  esac
+done
 
 if [[ $DRY -eq 0 && -z "${PUBLISH_TOKEN:-}" ]]; then
   echo "Нет PUBLISH_TOKEN. Публикация невозможна."
@@ -74,13 +88,33 @@ if [[ $DRY -eq 0 && -z "${PUBLISH_TOKEN:-}" ]]; then
   exit 1
 fi
 
-# Последний тег пакета в его репозитории: kufar.Foundation-1.0.2 → 1.0.2.
-latest_version() {
+# Версии пакета по тегам, по возрастанию: kufar.Foundation-1.0.2 → 1.0.2.
+# Порядок важен: потребитель может запросить любую, но публиковать снизу
+# вверх привычнее для чтения лога.
+versions_of() {
   local team="$1" pkg="$2"
   git -C "$ROOT/$team" tag --list "$pkg-*" \
     | sed "s/^$pkg-//" \
-    | sort -t. -k1,1n -k2,2n -k3,3n \
-    | tail -1
+    | sort -t. -k1,1n -k2,2n -k3,3n
+}
+
+# Публикует одну версию из её собственного тега.
+#
+# worktree, а не checkout: рабочая копия остаётся нетронутой, а параллельные
+# ветки и незакоммиченные правки не мешают. Каталог временный и удаляется
+# в любом случае — иначе `git worktree list` быстро зарастёт мусором.
+publish_version() {
+  local team="$1" pkg="$2" version="$3"
+  local tag="$pkg-$version"
+  local tmp; tmp="$(mktemp -d)"
+
+  # shellcheck disable=SC2064
+  trap "git -C '$ROOT/$team' worktree remove --force '$tmp' >/dev/null 2>&1 || true; rm -rf '$tmp'" RETURN
+
+  git -C "$ROOT/$team" worktree add --detach --quiet "$tmp" "$tag" || return 1
+  (cd "$ROOT/registry" && REGISTRY_URL="$REGISTRY" node scripts/publish.mjs \
+      --package "$tmp/$pkg" --scope "${pkg%%.*}" --name "${pkg#*.}" \
+      --version "$version" >/dev/null 2>&1)
 }
 
 printf "\nРеестр: %s\n" "$REGISTRY"
@@ -96,31 +130,46 @@ for entry in "${ORDER[@]}"; do
   pkg="${entry##*:}"
   dir="$ROOT/$team/$pkg"
 
-  version="$(latest_version "$team" "$pkg")"
-  if [[ -z "$version" ]]; then
-    printf "%-26s %-10s %s\n" "$pkg" "—" "тега нет, пропуск"
+  # Читаем в массив циклом, а не mapfile: в macOS системный bash — 3.2,
+  # где нет ни mapfile, ни отрицательных индексов массива. Скрипт обязан
+  # работать тем bash, который стоит из коробки: требовать `brew install bash`
+  # ради одной строки — плохой размен.
+  versions=()
+  while IFS= read -r _version; do
+    [[ -n "$_version" ]] && versions+=("$_version")
+  done < <(versions_of "$team" "$pkg")
+
+  if [[ ${#versions[@]} -eq 0 ]]; then
+    printf "%-26s %-10s %s\n" "$pkg" "—" "тегов нет, пропуск"
     skipped=$((skipped + 1))
     [[ "$ONLY" == "$pkg" ]] && break
     continue
   fi
+  newest="${versions[$(( ${#versions[@]} - 1 ))]}"
+  [[ $LATEST_ONLY -eq 1 ]] && versions=("$newest")
 
-  if [[ $DRY -eq 1 ]]; then
-    printf "%-26s %-10s %s\n" "$pkg" "$version" "будет опубликован"
-  else
-    if (cd "$ROOT/registry" && REGISTRY_URL="$REGISTRY" node scripts/publish.mjs \
-          --package "$dir" --scope "${pkg%%.*}" --name "${pkg#*.}" \
-          --version "$version" >/dev/null 2>&1); then
+  for version in "${versions[@]}"; do
+    if [[ $DRY -eq 1 ]]; then
+      printf "%-26s %-10s %s\n" "$pkg" "$version" "будет опубликован"
+      continue
+    fi
+
+    if publish_version "$team" "$pkg" "$version"; then
       printf "%-26s %-10s %s\n" "$pkg" "$version" "✓"
-    else
+    elif [[ "$version" == "$newest" ]]; then
+      # Последняя версия обязана уехать: на неё смотрит `latest`-режим
+      # и все, кто не фиксирует лок-файл. Дальше идти бессмысленно —
+      # потребители этого пакета упадут на резолве.
       printf "%-26s %-10s %s\n" "$pkg" "$version" "✗ не удалось"
       failed=$((failed + 1))
-      # Дальше идти бессмысленно: следующие пакеты зависят от этого
-      # и упадут на резолве, засыпав вывод вторичными ошибками.
       echo
       echo "Остановлено: потребители этого пакета всё равно не опубликуются."
       exit 1
+    else
+      # Старая версия могла уже лежать в реестре — это не повод останавливаться.
+      printf "%-26s %-10s %s\n" "$pkg" "$version" "— пропущена (уже есть или недоступна)"
     fi
-  fi
+  done
 
   [[ "$ONLY" == "$pkg" ]] && break
 done

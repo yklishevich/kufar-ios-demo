@@ -149,7 +149,7 @@ kufar-ios/                            ← воркспейс, не репози�
 
 | Команда | Репозитории | Что отдаёт наружу |
 |---|---|---|
-| **Platform Core** | `kufar.Foundation`, `kufar.Navigation`, `kufar.Analytics` | `SharedKernel`, `Networking`, `Navigation`, `AnalyticsAPI`, `AnalyticsImpl` |
+| **Platform Core** | `kufar.Foundation`, `kufar.Navigation`, `kufar.Analytics` | `SharedKernel`, `NetworkingInterface`, `Networking`, `NetworkingTesting`, `Navigation`, `AnalyticsAPI`, `AnalyticsImpl` |
 | ↳ та же | `kufar.DesignTokens`, `kufar.DesignComponents` | `DesignTokens`, `DesignComponents` |
 | ↳ та же | `kufar.SchemaKit`, `kufar.ListingKit` | `SchemaKit`, `ListingKit` |
 | ↳ та же | `kufar.AppFeature`, `kufar.AppComposition`, `KufarDemoApp` | `AppFeature`, `AppComposition`, приложение |
@@ -325,7 +325,8 @@ xcrun simctl openurl booted "kufar://help/rules"                   # веб-фо
 | **Вертикаль не знает соседей**: «объявления продавца» — это поиск | [`goods_team/.../GoodsDetailScreen.swift`](https://github.com/yklishevich/kufar-goods/blob/main/kufar.Goods/Sources/GoodsUI/GoodsDetailScreen.swift) |
 | **Роутер на таб**, `resetAll` при логауте | [`platform_team/.../AppRouter.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.Navigation/Sources/Navigation/AppRouter.swift) |
 | **Диплинк без вертикали** — экран-прокладка, `replaceLast` | [`platform_team/.../ListingResolve.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.AppFeature/Sources/AppFeature/ListingResolve.swift) |
-| **Инверсия зависимостей**: протокол внизу, реализация наверху | [`platform_team/.../Networking.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.Foundation/Sources/Networking/Networking.swift) → [`identity_team/.../KeychainSessionStore.swift`](https://github.com/yklishevich/kufar-identity/blob/main/kufar.Identity/Sources/AuthData/KeychainSessionStore.swift) |
+| **Инверсия зависимостей**: протокол внизу, реализация наверху | [`platform_team/.../NetworkingInterface.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.Foundation/Sources/NetworkingInterface/NetworkingInterface.swift) → [`identity_team/.../KeychainSessionStore.swift`](https://github.com/yklishevich/kufar-identity/blob/main/kufar.Identity/Sources/AuthData/KeychainSessionStore.swift) |
+| **Конкретика только в корне**: `import Networking` — один таргет на воркспейс | [`Tools/deplint.py`](https://github.com/yklishevich/kufar-ios-demo/blob/main/Tools/deplint.py) → [`platform_team/.../AppComposition.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.AppComposition/Sources/AppComposition/AppComposition.swift) |
 | **Сессия ≠ Auth**: логаут из настроек без `import Auth` | [`identity_team/.../ProfileScreens.swift`](https://github.com/yklishevich/kufar-identity/blob/main/kufar.Identity/Sources/ProfileUI/ProfileScreens.swift) |
 | **Композиционный корень** целиком | [`platform_team/.../AppComposition.swift`](https://github.com/yklishevich/kufar-platform/blob/main/kufar.AppComposition/Sources/AppComposition/AppComposition.swift) |
 
