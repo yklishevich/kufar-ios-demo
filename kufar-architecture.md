@@ -971,7 +971,7 @@ graph TD
 | Принцип | Где именно |
 |---|---|
 | **Dependency Rule** — зависимости к домену | `GoodsUI → GoodsDomain ← GoodsData`, красная стрелка в 1.3 |
-| **Инверсия на границе фреймворка** | `RequestInterceptor` объявлен в `Networking`, реализован в `Auth` (2.2) |
+| **Инверсия на границе фреймворка** | `RequestInterceptor` объявлен поставщиком в `Networking`, реализован в `Auth` (2.2); `ListingResolving` объявлен потребителем в `AppFeature`, реализован в composition root (5.3) |
 | **Домен не знает фреймворков** | `GoodsDomain` зависит только от `SharedKernel`, ни строчки SwiftUI |
 | **Composition root** | единственное место с конкретными реализациями |
 | **Тестируемость через границы** | `AppFeatureTests` собираются без сети, без `*Data`, без вертикалей |
