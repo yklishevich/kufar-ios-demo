@@ -14,7 +14,19 @@
      быть дешёвым для подключения;
   8. import *Testing только под #if DEBUG;
   9. в графе пакетов нет циклов;
- 10. предупреждения о мёртвых зависимостях.
+ 10. предупреждения о мёртвых зависимостях;
+ 11. CODEOWNERS лежит там, где GitHub его читает.
+
+Правила 1–2 выглядят дублированием компилятора — «незаявленный импорт
+и так не соберётся». Не соберётся не всегда: SwiftPM кладёт в пути поиска
+и прямые зависимости, и транзитивные, и объявленные продукты. Внутри пакета
+это лечится штатным флагом `swift build
+--explicit-target-dependency-import-check error` (по умолчанию выключен),
+а транзитивный импорт между пакетами не ловит и он. Именно этот случай
+здесь и страхуется: замыкание таргету не принадлежит — достаточно, чтобы
+чужой пакет-посредник взял новую зависимость, и модуль станет достижим,
+а манифест потребителя не изменится. Подробно — в README, «Почему правила
+1–2 линтера не дублируют компилятор».
 
 Запуск: python3 Tools/deplint.py
 """
@@ -74,6 +86,9 @@ CONTRACT_PACKAGES = {f"{SCOPE}.CatalogContracts", f"{SCOPE}.SearchContracts",
                      f"{SCOPE}.AutoContracts", f"{SCOPE}.IdentityContracts",
                      f"{SCOPE}.SessionContracts"}
 FOUNDATION_PACKAGE = f"{SCOPE}.Foundation"
+
+# Ровно эти три пути, и порядок именно такой — GitHub берёт первый найденный.
+CODEOWNERS_PLACES = ("CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")
 
 SYSTEM = {"Foundation", "SwiftUI", "Observation", "Combine", "XCTest",
           "UIKit", "AppKit", "OSLog", "Testing", "PackageDescription"}
@@ -354,6 +369,34 @@ def main() -> int:
                     where = f"{owner_pkg}." if owner_pkg else ""
                     warnings.append(f"[мёртвая зависимость] {pkg.name}/{target} "
                                     f"объявляет {where}{name}, но не импортирует")
+
+    # 11. CODEOWNERS там, где GitHub его читает
+    #
+    # GitHub ищет файл ровно в трёх местах корня репозитория и нигде больше.
+    # Вложенный kufar.Foundation/CODEOWNERS не даёт ни ошибки, ни
+    # предупреждения — он просто не действует, и обнаруживается это тем,
+    # что в чужой PR никого не позвали. Проверка нужна потому, что раньше
+    # проект был устроен как «репозиторий = пакет» и такие файлы работали;
+    # после переезда на «репозиторий = команда» все они стали декорацией.
+    #
+    # Разделять владение внутри репозитория надо ПУТЯМИ в одном файле:
+    #   /kufar.SearchContracts/  @kufar/ios-search @kufar/ios-platform
+    # Побеждает последнее совпавшее правило, а несколько владельцев —
+    # это ИЛИ: апрува достаточно от любого одного.
+    for team_dir in sorted({p.dir.parent for p in packages.values()}):
+        if not any((team_dir / rel).exists() for rel in CODEOWNERS_PLACES):
+            problems.append(
+                f"[владение] {team_dir.name}: нет CODEOWNERS ни в одном из мест, "
+                f"которые читает GitHub ({', '.join(CODEOWNERS_PLACES)})")
+        for found in sorted(team_dir.rglob("CODEOWNERS")):
+            if ".build" in found.parts or ".attic" in found.parts:
+                continue
+            rel = found.relative_to(team_dir).as_posix()
+            if rel not in CODEOWNERS_PLACES:
+                problems.append(
+                    f"[мёртвый CODEOWNERS] {team_dir.name}/{rel} — GitHub читает файл "
+                    f"только из корня репозитория, .github/ или docs/; этот игнорируется. "
+                    f"Владение внутри репозитория задаётся путями в корневом файле")
 
     # Репозиториев больше не считаем: с переходом на реестр имя репозитория
     # перестало быть идентичностью, и сколько пакетов лежит в одном репозитории —
