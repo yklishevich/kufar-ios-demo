@@ -20,3 +20,7 @@ node_modules/
 
 # Состояние окна воркспейса
 KufarWorkspace.xcworkspace/xcuserdata/
+
+# Байткод инструментов из Tools/. Появляется при первом же запуске
+# deplint.py или gen-graph.py и не несёт информации.
+__pycache__/

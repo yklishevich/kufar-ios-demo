@@ -56,6 +56,7 @@ ORDER=(
   "goods_team:kufar.GoodsContracts"
   "auto_team:kufar.AutoContracts"
   "identity_team:kufar.IdentityContracts"
+  "identity_team:kufar.SessionContracts"
   # Дизайн-система и киты
   "platform_team:kufar.DesignComponents"
   "platform_team:kufar.SchemaKit"

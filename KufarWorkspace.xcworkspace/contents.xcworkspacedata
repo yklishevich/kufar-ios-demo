@@ -45,6 +45,9 @@
       location = "group:identity_team/kufar.IdentityContracts">
    </FileRef>
    <FileRef
+      location = "group:identity_team/kufar.SessionContracts">
+   </FileRef>
+   <FileRef
       location = "group:platform_team/kufar.Analytics">
    </FileRef>
    <FileRef

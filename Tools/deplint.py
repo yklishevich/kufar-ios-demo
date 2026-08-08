@@ -71,7 +71,8 @@ ASSEMBLIES = set(VERTICALS)
 SCOPE = "kufar"
 CONTRACT_PACKAGES = {f"{SCOPE}.CatalogContracts", f"{SCOPE}.SearchContracts",
                      f"{SCOPE}.PostingContracts", f"{SCOPE}.GoodsContracts",
-                     f"{SCOPE}.AutoContracts", f"{SCOPE}.IdentityContracts"}
+                     f"{SCOPE}.AutoContracts", f"{SCOPE}.IdentityContracts",
+                     f"{SCOPE}.SessionContracts"}
 FOUNDATION_PACKAGE = f"{SCOPE}.Foundation"
 
 SYSTEM = {"Foundation", "SwiftUI", "Observation", "Combine", "XCTest",
