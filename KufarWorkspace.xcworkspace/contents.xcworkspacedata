@@ -10,22 +10,9 @@
    <FileRef
       location = "group:architecture-overall.md">
    </FileRef>
-   <Group
-      location = "group:Tools"
-      name = "Tools">
-      <FileRef
-         location = "group:publish.sh">
-      </FileRef>
-      <FileRef
-         location = "group:bootstrap.sh">
-      </FileRef>
-      <FileRef
-         location = "group:deplint.py">
-      </FileRef>
-      <FileRef
-         location = "group:check-registry.sh">
-      </FileRef>
-   </Group>
+   <FileRef
+      location = "group:Tools">
+   </FileRef>
    <FileRef
       location = "group:auto_team/kufar.Auto">
    </FileRef>
